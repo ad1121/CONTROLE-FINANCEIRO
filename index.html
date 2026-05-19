@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle Financeiro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    /* ── Reset & base ───────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #F7F6F2;
+      --surface:  #FFFFFF;
+      --border:   #E2E0D8;
+      --text:     #1A1917;
+      --muted:    #7A7870;
+      --green:    #1D9E75;
+      --green-bg: #E1F5EE;
+      --red:      #D85A30;
+      --red-bg:   #FAECE7;
+      --accent:   #3A3730;
+      --radius:   12px;
+      --font:     'DM Sans', sans-serif;
+      --mono:     'DM Mono', monospace;
+    }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Layout ─────────────────────────────────── */
+    .app { max-width: 860px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: -.02em;
+    }
+    .logo span { color: var(--green); }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ccc; display: inline-block;
+      margin-right: 6px; transition: background .3s;
+    }
+    .status-dot.ok  { background: var(--green); }
+    .status-dot.err { background: var(--red); }
+    #status-label { font-size: 12px; color: var(--muted); }
+
+    /* ── Config banner ───────────────────────────── */
+    #config-banner {
+      background: #FFF8E1;
+      border: 1px solid #FFD54F;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 13px;
+      line-height: 1.7;
+      display: none;
+    }
+    #config-banner code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(0,0,0,.06);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* ── Metrics ─────────────────────────────────── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 1.5rem;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      animation: fadeUp .4s ease both;
+    }
+    .metric:nth-child(2) { animation-delay: .05s; }
+    .metric:nth-child(3) { animation-delay: .1s; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .metric-value {
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+    .metric-value.income  { color: var(--green); }
+    .metric-value.expense { color: var(--red); }
+
+    /* ── Form ────────────────────────────────────── */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      animation: fadeUp .4s .15s ease both;
+    }
+    .form-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .type-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      width: fit-content;
+    }
+    .type-btn {
+      padding: 7px 20px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--muted);
+      transition: background .15s, color .15s;
+    }
+    .type-btn.active-income  { background: var(--green-bg); color: #0F6E56; }
+    .type-btn.active-expense { background: var(--red-bg);   color: #993C1D; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 8px;
+      align-items: stretch;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    input:focus, select:focus { border-color: #aaa; }
+    .add-btn {
+      padding: 8px 18px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .15s, transform .1s;
+    }
+    .add-btn:hover   { opacity: .85; }
+    .add-btn:active  { transform: scale(.97); }
+    .add-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Main grid ───────────────────────────────── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      animation: fadeUp .4s .2s ease both;
+    }
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ── Entry list ──────────────────────────────── */
+    #entry-list { max-height: 320px; overflow-y: auto; }
+    .entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp .25s ease both;
+    }
+    .entry:last-child { border-bottom: none; }
+    .entry-desc { font-size: 13px; font-weight: 500; }
+    .entry-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .entry-right { display: flex; align-items: center; gap: 10px; }
+    .entry-val {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .entry-val.income  { color: var(--green); }
+    .entry-val.expense { color: var(--red); }
+    .del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ccc;
+      font-size: 16px;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 4px;
+      transition: color .15s, background .15s;
+    }
+    .del-btn:hover { color: var(--red); background: var(--red-bg); }
+    .empty { font-size: 13px; color: var(--muted); text-align: center; padding: 2rem 0; }
+
+    /* ── Chart ───────────────────────────────────── */
+    .chart-wrap { position: relative; width: 100%; height: 200px; }
+    #chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-dot  { width: 8px; height: 8px; border-radius: 2px; }
+
+    /* ── Loading overlay ─────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 620px) {
+      .metrics    { grid-template-columns: 1fr 1fr; }
+      .metrics .metric:last-child { grid-column: span 2; }
+      .form-row   { grid-template-columns: 1fr 1fr; }
+      .main-grid  { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">finança<span>.</span></div>
+    <div>
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-label">conectando…</span>
+    </div>
+  </header>
+
+  <!-- Banner mostrado se URL não foi configurada -->
+  <div id="config-banner">
+    ⚠️ <strong>Configure o Apps Script:</strong> edite a constante <code>APPS_SCRIPT_URL</code>
+    no início deste arquivo <code>index.html</code> e cole a URL da sua implantação do Google Apps Script.
+    <br>Veja o <code>Code.gs</code> para instruções de implantação.
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Receitas</div>
+      <div class="metric-value income" id="total-income">R$ 0,00</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Despesas</div>
+      <div class="metric-value expense" id="total-expense">R$ 0,00</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Saldo</div>
+      <div class="metric-value" id="total-balance">R$ 0,00</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-label">Nova transação</div>
+    <div class="type-toggle" id="type-toggle">
+      <button class="type-btn active-income" data-type="income" onclick="setType('income')">+ Receita</button>
+      <button class="type-btn"               data-type="expense" onclick="setType('expense')">− Despesa</button>
+    </div>
+    <div class="form-row">
+      <input type="text"   id="desc-input" placeholder="Descrição..." />
+      <input type="number" id="val-input"  placeholder="Valor (R$)" min="0" step="0.01" />
+      <select id="cat-select"></select>
+      <button class="add-btn" id="add-btn" onclick="addEntry()">Adicionar</button>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-title">
+        <span>Transações</span>
+        <span id="count-label" style="font-weight:400;">—</span>
+      </div>
+      <div id="entry-list"><div class="empty">Carregando…</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Despesas por categoria</div>
+      <div class="chart-wrap">
+        <canvas id="cat-chart" role="img" aria-label="Gráfico de despesas por categoria">Sem dados.</canvas>
+      </div>
+      <div id="chart-legend"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =====================================================
+//  ⚙️  CONFIGURE AQUI — cole a URL do Apps Script
+// =====================================================
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/SEU_ID_AQUI/exec";
+// =====================================================
+
+const CATS = {
+  income:  ["Salário","Freelance","Investimentos","Outros"],
+  expense: ["Alimentação","Moradia","Transporte","Saúde","Educação","Lazer","Compras","Outros"]
+};
+const COLORS = ["#1D9E75","#378ADD","#D85A30","#BA7517","#D4537E","#639922","#7F77DD","#888780"];
+
+let entries = [];
+let currentType = "income";
+let chartInstance = null;
+let saving = false;
+
+// ── Helpers ──────────────────────────────────────────
+
+function fmt(v) {
+  return "R$ " + Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR");
+}
+
+function setStatus(state, label) {
+  const dot = document.getElementById("status-dot");
+  dot.className = "status-dot " + (state === "ok" ? "ok" : state === "err" ? "err" : "");
+  document.getElementById("status-label").textContent = label;
+}
+
+function isConfigured() {
+  return APPS_SCRIPT_URL && !APPS_SCRIPT_URL.includes("SEU_ID_AQUI");
+}
+
+// ── API ───────────────────────────────────────────────
+
+async function api(params) {
+  const url = APPS_SCRIPT_URL + "?" + new URLSearchParams(params);
+  const res  = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+async function loadAll() {
+  if (!isConfigured()) {
+    document.getElementById("config-banner").style.display = "block";
+    setStatus("err", "URL não configurada");
+    document.getElementById("entry-list").innerHTML = '<div class="empty">Configure o Apps Script URL acima.</div>';
+    return;
+  }
+  setStatus("", "carregando…");
+  try {
+    const data = await api({ action: "getAll" });
+    if (data.error) throw new Error(data.error);
+    entries = data.entries || [];
+    setStatus("ok", "sincronizado");
+    render();
+  } catch (e) {
+    setStatus("err", "erro ao carregar");
+    console.error(e);
+  }
+}
+
+async function addEntry() {
+  const desc = document.getElementById("desc-input").value.trim();
+  const val  = parseFloat(document.getElementById("val-input").value);
+  const cat  = document.getElementById("cat-select").value;
+  if (!desc || isNaN(val) || val <= 0) return;
+  if (!isConfigured()) return alert("Configure o APPS_SCRIPT_URL primeiro.");
+
+  saving = true;
+  const btn = document.getElementById("add-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Salvando…';
+
+  try {
+    const res = await api({ action: "add", type: currentType, desc, val, cat });
+    if (res.error) throw new Error(res.error);
+    document.getElementById("desc-input").value = "";
+    document.getElementById("val-input").value  = "";
+    // Insere localmente sem recarregar tudo
+    entries.unshift({ id: res.id, type: currentType, desc, val, cat, date: new Date().toISOString() });
+    setStatus("ok", "salvo");
+    render();
+  } catch (e) {
+    setStatus("err", "erro ao salvar");
+    console.error(e);
+  } finally {
+    saving = false;
+    btn.disabled = false;
+    btn.textContent = "Adicionar";
+  }
+}
+
+async function delEntry(id) {
+  if (!confirm("Remover esta transação?")) return;
+  setStatus("", "removendo…");
+  try {
+    const res = await api({ action: "del", id });
+    if (res.error) throw new Error(res.error);
+    entries = entries.filter(e => e.id != id);
+    setStatus("ok", "removido");
+    render();
+  } catch (e) {
+    setStatus("err", "erro ao remover");
+    console.error(e);
+  }
+}
+
+// ── UI ────────────────────────────────────────────────
+
+function setType(type) {
+  currentType = type;
+  document.querySelectorAll(".type-btn").forEach(b => {
+    b.className = "type-btn" + (b.dataset.type === type
+      ? (type === "income" ? " active-income" : " active-expense")
+      : "");
+  });
+  refreshCatSelect();
+}
+
+function refreshCatSelect() {
+  const sel = document.getElementById("cat-select");
+  sel.innerHTML = CATS[currentType].map(c => `<option>${c}</option>`).join("");
+}
+
+function render() {
+  const income  = entries.filter(e => e.type === "income").reduce((s, e) => s + parseFloat(e.val), 0);
+  const expense = entries.filter(e => e.type === "expense").reduce((s, e) => s + parseFloat(e.val), 0);
+  const balance = income - expense;
+
+  document.getElementById("total-income").textContent  = fmt(income);
+  document.getElementById("total-expense").textContent = fmt(expense);
+  const balEl = document.getElementById("total-balance");
+  balEl.textContent  = (balance < 0 ? "−" : "") + fmt(balance);
+  balEl.style.color  = balance >= 0 ? "var(--green)" : "var(--red)";
+
+  document.getElementById("count-label").textContent =
+    entries.length + " " + (entries.length === 1 ? "item" : "itens");
+
+  const list = document.getElementById("entry-list");
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="empty">Nenhuma transação ainda</div>';
+  } else {
+    list.innerHTML = entries.map(e => `
+      <div class="entry">
+        <div>
+          <div class="entry-desc">${escHtml(e.desc)}</div>
+          <div class="entry-meta">${escHtml(e.cat)} · ${fmtDate(e.date)}</div>
+        </div>
+        <div class="entry-right">
+          <span class="entry-val ${e.type}">${e.type === "income" ? "+" : "−"}${fmt(parseFloat(e.val))}</span>
+          <button class="del-btn" onclick="delEntry('${e.id}')" aria-label="Remover">×</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  renderChart(entries.filter(e => e.type === "expense"));
+}
+
+function renderChart(expenses) {
+  const catMap = {};
+  expenses.forEach(e => { catMap[e.cat] = (catMap[e.cat] || 0) + parseFloat(e.val); });
+  const cats = Object.keys(catMap);
+  const vals = cats.map(c => catMap[c]);
+  const legend = document.getElementById("chart-legend");
+
+  if (cats.length === 0) {
+    legend.innerHTML = "";
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    document.getElementById("cat-chart").textContent = "Sem despesas.";
+    return;
+  }
+
+  legend.innerHTML = cats.map((c, i) => `
+    <div class="legend-item">
+      <span class="legend-dot" style="background:${COLORS[i % COLORS.length]}"></span>${c}
+    </div>`).join("");
+
+  const canvas = document.getElementById("cat-chart");
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: cats,
+      datasets: [{
+        data: vals,
+        backgroundColor: cats.map((_, i) => COLORS[i % COLORS.length]),
+        borderWidth: 3,
+        borderColor: "#fff",
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => " " + fmt(ctx.raw) } }
+      }
+    }
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+// ── Init ──────────────────────────────────────────────
+refreshCatSelect();
+loadAll();
+// Recarrega a cada 60 segundos
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
